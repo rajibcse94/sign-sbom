@@ -1,0 +1,5 @@
+node_modules/
+build/
+*.log
+.DS_Store
+# NB: dist/ is intentionally NOT ignored — GitHub Actions require the bundled dist/index.js to be committed.

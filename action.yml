@@ -1,0 +1,52 @@
+name: 'LedgerProve — Sign SBOM'
+description: 'Cryptographically sign your SBOM with ECDSA-P521 and append it to LedgerProve''s tamper-evident hash chain.'
+author: 'LedgerProve Ltd'
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  api-key:
+    description: 'Your LedgerProve API key (lp_live_…). Generate at https://ledgerprove.com/dashboard. Store as a repo or org secret.'
+    required: true
+  sbom-file:
+    description: 'Path to your SBOM file (CycloneDX or SPDX JSON). Generate it in an earlier step with syft, cyclonedx, or your tool of choice.'
+    required: true
+  repo-id:
+    description: 'Repository identifier under which to record this build. Defaults to GITHUB_REPOSITORY (e.g. acme/api).'
+    required: false
+    default: ${{ github.repository }}
+  commit-hash:
+    description: 'Commit SHA to record. Defaults to GITHUB_SHA.'
+    required: false
+    default: ${{ github.sha }}
+  build-status:
+    description: 'PASS, FAIL, or WARN. Defaults to PASS.'
+    required: false
+    default: 'PASS'
+  cve-count:
+    description: 'Number of CVEs found in this build, if known. Defaults to 0.'
+    required: false
+    default: '0'
+  api-url:
+    description: 'Override LedgerProve API URL. Only set this for self-hosted or staging environments.'
+    required: false
+    default: 'https://api.ledgerprove.com'
+
+outputs:
+  verification-id:
+    description: 'Public verification ID (24-char hex)'
+  verification-url:
+    description: 'Public verification URL — share this anywhere'
+  signature-algorithm:
+    description: 'Always ECDSA-P521-SHA512'
+  chain-index:
+    description: 'Position of this record in your organisation''s hash chain'
+  record-hash:
+    description: 'SHA-512 of this signed record'
+  timestamped:
+    description: 'true if RFC 3161 timestamp was attached, false otherwise'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
