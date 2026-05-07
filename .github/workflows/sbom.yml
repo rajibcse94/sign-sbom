@@ -1,0 +1,11 @@
+name: SBOM
+on: [push, pull_request]
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ledgerprove/sign-sbom@v1
+        with:
+          api-key: ${{ secrets.LEDGERPROVE_API_KEY }}
