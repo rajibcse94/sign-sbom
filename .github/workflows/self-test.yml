@@ -1,0 +1,23 @@
+name: Self-test the Action
+on:
+  workflow_dispatch:           # run manually from the Actions tab
+  push:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign the sample SBOM with this Action
+        id: ledgerprove
+        uses: ./                          # use the Action from this same repo
+        with:
+          api-key: ${{ secrets.LEDGERPROVE_API_KEY }}
+          sbom-file: ./sample-sbom.json
+          repo-id: rajibcse94/sign-sbom-self-test
+          commit-hash: ${{ github.sha }}
+
+      - name: Print the verify URL
+        run: echo "Signed → ${{ steps.ledgerprove.outputs.verification-url }}"
