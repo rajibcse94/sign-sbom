@@ -50,6 +50,54 @@ function countPackages(json: unknown): number {
   return 0;
 }
 
+// Extract a flat package list from an SBOM for the API's diff feature.
+// Keeps name + version + ecosystem only — everything else (licenses,
+// hashes, supplier metadata) stays out of the API payload. CycloneDX and
+// SPDX have completely different schemas; we normalise to one shape.
+//
+// Returned list is capped at 5000 entries to match the API limit. Larger
+// SBOMs send the first 5000 — the diff will be partial in that pathological
+// case, but very few real projects exceed it.
+interface SbomPkg { name: string; version?: string; ecosystem?: string }
+function extractPackages(json: unknown): SbomPkg[] {
+  const out: SbomPkg[] = [];
+  const o = json as Record<string, unknown>;
+  // CycloneDX: components: [{ name, version, purl }]
+  if (Array.isArray(o.components)) {
+    for (const c of o.components as Array<Record<string, unknown>>) {
+      const name = typeof c.name === 'string' ? c.name : null;
+      if (!name) continue;
+      const version = typeof c.version === 'string' ? c.version : undefined;
+      // Ecosystem is encoded in the purl: pkg:npm/foo@1.2.3 → ecosystem=npm
+      let ecosystem: string | undefined;
+      if (typeof c.purl === 'string') {
+        const m = /^pkg:([a-z0-9.+-]+)\//i.exec(c.purl);
+        if (m) ecosystem = m[1]!.toLowerCase();
+      }
+      out.push(version || ecosystem ? { name, version, ecosystem } : { name });
+      if (out.length >= 5000) break;
+    }
+  } else if (Array.isArray(o.packages)) {
+    // SPDX: packages: [{ name, versionInfo, externalRefs: [{ referenceType: 'purl', referenceLocator }] }]
+    for (const p of o.packages as Array<Record<string, unknown>>) {
+      const name = typeof p.name === 'string' ? p.name : null;
+      if (!name) continue;
+      const version = typeof p.versionInfo === 'string' ? p.versionInfo : undefined;
+      let ecosystem: string | undefined;
+      const refs = Array.isArray(p.externalRefs) ? (p.externalRefs as Array<Record<string, unknown>>) : [];
+      for (const r of refs) {
+        if (r.referenceType === 'purl' && typeof r.referenceLocator === 'string') {
+          const m = /^pkg:([a-z0-9.+-]+)\//i.exec(r.referenceLocator);
+          if (m) { ecosystem = m[1]!.toLowerCase(); break; }
+        }
+      }
+      out.push(version || ecosystem ? { name, version, ecosystem } : { name });
+      if (out.length >= 5000) break;
+    }
+  }
+  return out;
+}
+
 // If the user didn't provide an SBOM file, install Syft and generate one.
 // Syft is the de-facto standard SBOM generator and works for npm, PyPI, Go,
 // Maven, RubyGems, crates, and most other ecosystems out of the box.
@@ -163,6 +211,10 @@ async function run(): Promise<void> {
     catch { /* not JSON — that's fine, we still hash and submit */ }
     const sbomFormat = detectSbomFormat(sbomJson);
     const packageCount = countPackages(sbomJson);
+    // packages: extracted flat list (name + version + ecosystem) so the
+    // LedgerProve API can compute build-to-build diffs server-side.
+    // Server treats this as optional — older action versions still work.
+    const packages = extractPackages(sbomJson);
 
     core.info(`SBOM file:    ${sbomFile} (${sbomBytes.length} bytes)`);
     core.info(`Format:       ${sbomFormat}`);
@@ -181,6 +233,9 @@ async function run(): Promise<void> {
       cveCount,
       buildStatus,
       sbomFormat,
+      // Optional — Starter+ plans use this for SBOM diff. Lower plans store
+      // it harmlessly but can't query the diff endpoint.
+      packages,
     });
 
     core.info(`Submitting to ${apiUrl}/api/v1/sbom …`);
