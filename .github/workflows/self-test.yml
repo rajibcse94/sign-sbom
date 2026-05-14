@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
 
+# Read-only GITHUB_TOKEN — workflow only checks out the repo and runs the
+# action. No writes to issues, PRs, releases, or packages.
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest

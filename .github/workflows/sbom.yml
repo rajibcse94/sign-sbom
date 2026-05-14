@@ -1,6 +1,12 @@
 name: SBOM
 on: [push, pull_request]
 
+# Principle of least privilege: GITHUB_TOKEN only needs to read repo contents
+# to clone the code. We don't push, comment, or modify anything. Explicit
+# permissions block silences the CodeQL "missing-workflow-permissions" alert.
+permissions:
+  contents: read
+
 jobs:
   sign:
     runs-on: ubuntu-latest

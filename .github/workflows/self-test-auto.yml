@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
 
+# Read-only GITHUB_TOKEN — workflow only checks out the repo and runs the
+# action against an auto-generated SBOM. No writes anywhere.
+permissions:
+  contents: read
+
 jobs:
   auto:
     runs-on: ubuntu-latest
